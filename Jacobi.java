@@ -131,7 +131,7 @@ public class Jacobi
             FileOutputFormat.setOutputPath(job, new Path(outputPath+"/"+Integer.toString(i+1)));
             job.waitForCompletion(true);
 
-            if ((int)job.getCounters().findCounter(ConvergeCounter.INCONVERGED).getValue() == matrixSize) {
+            if ((int)job.getCounters().findCounter(ConvergeCounter.INCONVERGED).getValue() == Integer.parseInt(matrixSize)) {
                 break;
             }
         }
