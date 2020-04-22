@@ -84,10 +84,10 @@ public class Jacobi
             double xi = 0.0;
             for (int j = 0; j < N; j++) {
                 if (i != j) {
-                    xi += Ai[j] * x[j];
+                    xi -= Ai[j] * x[j];
                 }
             }
-            xi = bi - xi;
+            xi += bi;
             xi /= Ai[i];
 
 
