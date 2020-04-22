@@ -9,7 +9,7 @@ import java.util.StringTokenizer;
 
 public class Jacobi {
 
-    public static final boolean verbose = true;
+    public static final boolean verbose = false;
     public static final int print_n  = 5;
     public static final int max_iter = 100;
     public static final double eps = 1e-10;
