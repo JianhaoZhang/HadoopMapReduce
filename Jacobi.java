@@ -167,11 +167,11 @@ public class Jacobi {
 
     public static void main(String[] args) throws Exception
     {
-        String matrixSize = args[0];
-        int maxIt = Integer.parseInt(args[1]);
-        int reducers = Integer.parseInt(args[2]);
-        String inputPath = args[3];
-        String outputPath = args[4];
+        String matrixSize = args[2];
+        int maxIt = Integer.parseInt(args[3]);
+        int reducers = Integer.parseInt(args[4]);
+        String inputPath = args[0];
+        String outputPath = args[1];
         Configuration conf;
         Job job;
 
