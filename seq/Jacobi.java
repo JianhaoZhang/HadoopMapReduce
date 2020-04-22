@@ -72,14 +72,14 @@ public class Jacobi {
                 System.out.format("iteration %5d X = [", iter);
                 if(n < 2*print_n) {
                     for (int i = 0; i < n; i++)
-                        System.out.format(" %20.3f ", X[i]);
+                        System.out.print(X[i]);
                     System.out.println("]");
                 } else {
                     for (int i = 0; i < print_n; i++)
-                        System.out.format(" %20.3f ", X[i]);
+                        System.out.print(X[i]);
                     System.out.format(" ... ");
                     for (int i = n-print_n; i < n; i++)
-                        System.out.format(" %20.3f ", X[i]);
+                        System.out.print(X[i]);
                     System.out.println("]");
                 }
             }
