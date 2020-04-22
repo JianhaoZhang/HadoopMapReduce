@@ -131,9 +131,10 @@ public class Jacobi
             FileOutputFormat.setOutputPath(job, new Path(outputPath+"/"+Integer.toString(i+1)));
             job.waitForCompletion(true);
 
-            if ((int)job.getCounters().findCounter(ConvergeCounter.INCONVERGED).getValue() == Integer.parseInt(matrixSize)) {
+            if ((int)job.getCounters().findCounter(ConvergeCounter.INCONVERGED).getValue() == 0) {
                 break;
             }
+            job.getCounters().findCounter(ConvergeCounter.INCONVERGED).setValue(0);
         }
     }
 }
