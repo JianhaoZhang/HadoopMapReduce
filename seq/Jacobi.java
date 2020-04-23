@@ -1,150 +1,161 @@
-import java.io.IOException;
-import java.util.*;
-import java.lang.InterruptedException;
+/*
+  Modified from http://rendon.x10.mx/?p=189
+  Assumes strictly diagonaly dominant matrices as input
+*/
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.io.*;
-import org.apache.hadoop.mapreduce.*;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.*;
+import java.io.*;
+import java.util.Arrays;
+import java.util.StringTokenizer;
 
-import org.apache.commons.logging.Log;
+public class Jacobi {
 
+    public static final boolean verbose = false;
+    public static final int print_n  = 5;
+    public static final int max_iter = 100;
+    public static final double eps = 1e-10;
 
-public class Jacobi
-{
+    private double[][] Ab;
+    int n;
 
-    public enum ConvergeCounter {INCONVERGED}
-
-    /* Input
-     *   < offset, "i, j, A[i][j]" >
-     *   < offset, "i, N, b[i]" >
-     *   < offset, "i, x[i]" >
-     * Output
-     *   < i, "N, b[i]" >
-     *   < i, "j, A[i][j]" >
-     *   < j, "i, xx[i]" > j = 0..N-1, i != j
-     */
-    public static class JacobiMapper extends Mapper<Object, Text, IntWritable, Text> {
-        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            int N = Integer.parseInt(conf.get("matrixSize"));
-            String[] strArr = value.toString().split("\\s+");
-            int i = Integer.parseInt(strArr[0]);
-
-            if (strArr.length == 3) {
-                context.write(new IntWritable(i), new Text(strArr[1]+" "+strArr[2]));
-            } else {
-                for (int j = 0; j < N; j++) {
-                    if (j != i) {
-                        context.write(new IntWritable(j), new Text(String.valueOf(i)+"\tx"+strArr[1]));
-                    }
-                }
+    public Jacobi(double [][] matrix,  int n) {
+        Ab = new double[n][n+1];
+        this.n = n;
+        for (int i = 0; i < n; i++) {
+            double sum = 0;
+            for (int j = 0; j < n; j++) {
+                Ab[i][j] = matrix[i][j];
+                sum += Math.abs(Ab[i][j]);
+            }
+            Ab[i][n] = matrix[i][n];
+            if (2 * Math.abs(Ab[i][i]) <= sum) {
+                System.out.println("Input matrix is not SDD");
+                System.out.format("i = %d, Ab[%d][%d]=%f, sum=%f\n",
+                                  i, i, i, 2 * Math.abs(Ab[i][i]), sum);
             }
         }
     }
 
+    public void print()
+    {
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                if(Ab[i][j] != 0)
+                    System.out.format("%-8d %-8d %.5f\n", i, j, Ab[i][j]);
+            }
+        }
+        System.out.format("%d %d %d\n", 0, 0, 0);
+    }
 
+    public void solve()
+    {
+        int iter = 0;
+        double[] X = new double[n]; // Approximations
+        double[] P = new double[n]; // Prev
+        Arrays.fill(X, 0);
+        Arrays.fill(P, 0);
 
+        while (iter++ < max_iter) {
+            if(verbose)
+                System.out.println("************************");
+            for (int i = 0; i < n; i++) {
+                double sum = 0;
 
+                for (int j = 0; j < n; j++)
+                    if (j != i)
+                        sum -= Ab[i][j] * P[j];
+                sum  += Ab[i][n]; // B[n]
+                // System.out.format("sum %f \n", sum);
+                X[i]  = sum/Ab[i][i];
+            }
 
-
-
-    /* Input
-     *   < i, "N, b[i]" >
-     *   < i, "j, A[i][j]" > j = 0..N-1
-     *   < i, "j, xx[j]" > j = 0..N-1, i != j
-     * Build A[i][] and x[]
-     *   x[i] = (b[i] - sum_i!=j(A[i][j]*x[j])) / A[i][i].
-     * Output
-     *   < i, "x[i]" > if x[i] != 0.
-     */
-    public static class JacobiReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
-
-        public void reduce(IntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            int N = Integer.parseInt(conf.get("matrixSize"));
-
-            double bi = 0.0;
-            double[] Ai = new double[N];
-            double[] x = new double[N];
-            int i = key.get();
-
-          /* Build Ai[], x[] and bi. */
-            for (Text value: values) {
-                String[] strArr = value.toString().split("\\s+");
-                int j = Integer.parseInt(strArr[0]);
-                if (j == N) {
-                    bi = Double.parseDouble(strArr[1]);
-                } else if (strArr[1].indexOf("x") != -1) {
-                    x[j] = Double.parseDouble(strArr[1].replace("x", ""));
+            System.out.println(iter);
+            for (int i = 0; i < n; i++){
+                System.out.print(i); 
+                System.out.print(" ");
+                System.out.println(X[i]);
+            }
+                
+            if(verbose) {
+                System.out.format("iteration %5d X = [", iter);
+                if(n < 2*print_n) {
+                    for (int i = 0; i < n; i++)
+                        System.out.print(X[i]);
+                    System.out.println("]");
                 } else {
-                    Ai[j] = Double.parseDouble(strArr[1]);
+                    for (int i = 0; i < print_n; i++)
+                        System.out.print(X[i]);
+                    System.out.format(" ... ");
+                    for (int i = n-print_n; i < n; i++)
+                        System.out.print(X[i]);
+                    System.out.println("]");
                 }
             }
 
+            if (iter == 1)
+                continue;
 
-          /* Compute x[i]. */
-            double xi = 0.0;
-            for (int j = 0; j < N; j++) {
-                if (i != j) {
-                    xi += Ai[j] * x[j];
-                }
-            }
-            xi = bi - xi;
-            xi /= Ai[i];
+            boolean stop = true;
+            for (int i = 0; i < n && stop; i++)
+                if (Math.abs(X[i] - P[i]) > eps)
+                    stop = false;
+            if (stop)
+                break;
 
+            P = (double[])X.clone();
+        }
 
-          /* Compare new and old xi. */
-            if (Math.abs(xi-x[i]) > 1e-10) {
-                /* Counter++ */
-                context.getCounter(ConvergeCounter.INCONVERGED).increment(1);
-            }
-
-            /* Output. */
-            if (xi != 0) {
-                context.write(new IntWritable(i), new Text(String.valueOf(xi)));
-            }
+        System.out.print("Converged after " + iter + " iterations ");
+        System.out.format("with a convergence threshold set at %e\n", eps);
+        if(verbose) {
+            for (int i = 0; i < n; i++)
+                System.out.format("%-10d \t %-5.5f\n", i, X[i]);
         }
     }
 
+    public static void main(String[] args) throws IOException
+    {
+        int n;
+        double[][] matrix;
 
-
-
-
-
-    public static void main(String[] args) throws Exception {
-        String matrixSize = args[0];
-        int maxIt = Integer.parseInt(args[1]);
-        int reducers = Integer.parseInt(args[2]);
-        String inputPath = args[3];
-        String outputPath = args[4];
-
-        for (int i = 0; i < maxIt; i++) {
-            Configuration conf = new Configuration();
-            conf.set("matrixSize", matrixSize);
-
-            Job job = Job.getInstance(conf, "Jacobi " + String.valueOf(i));
-            job.setNumReduceTasks(reducers);
-            job.setJarByClass(Jacobi.class);
-            job.setMapperClass(JacobiMapper.class);
-            job.setReducerClass(JacobiReducer.class);
-
-            job.setOutputKeyClass(IntWritable.class);
-            job.setOutputValueClass(Text.class);
-
-            FileInputFormat.addInputPath(job, new Path(inputPath));
-            if (i > 0) {
-                FileInputFormat.addInputPath(job, new Path(outputPath+"/"+Integer.toString(i)));
-            }
-            FileOutputFormat.setOutputPath(job, new Path(outputPath+"/"+Integer.toString(i+1)));
-            job.waitForCompletion(true);
-
-            if ((int)job.getCounters().findCounter(ConvergeCounter.INCONVERGED).getValue() == 0) {
-                break;
-            }
+        if(args.length == 0) {
+            System.err.println("Usage:  java Jacobi <file.dat>\n" +
+                               "where <file.dat> the input matrix file");
+            return;
         }
+
+        // assuming input file: path/n.dat
+        // where n is the matrix A [nxn] , vector b[n] size
+        // matrix A and vector b are provided as a single [n X n+1]
+        // matrix, where b takes up the last column
+        BufferedReader br = new BufferedReader(new FileReader(args[0]));
+        int prefix = args[0].lastIndexOf('/') + 1;
+        int suffix = args[0].lastIndexOf('.');
+        n = Integer.parseInt(args[0].substring(prefix, suffix));
+        matrix = new double[n][n+1];
+        try {
+            String line = br.readLine();
+            while(line != null) {
+                String[] tokens = line.trim().split("\\s+");
+                if(tokens.length != 3)
+                    throw new IOException("Input file has improper format");
+                int x = Integer.parseInt(tokens[0]);
+                int y = Integer.parseInt(tokens[1]);
+                double val = Double.parseDouble(tokens[2]);
+                if(verbose)
+                    System.out.format("[%d,%d]=%.3f\n", x, y, val);
+                matrix[x][y] = val;
+                line = br.readLine();
+            }
+        } finally {
+            br.close();
+        }
+
+        if(verbose)
+            System.out.println("***********************************************");
+
+        Jacobi jacobi = new Jacobi(matrix, n);
+
+        //jacobi.print();
+        jacobi.solve();
     }
 }
