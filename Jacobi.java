@@ -13,20 +13,10 @@ import org.apache.hadoop.util.*;
 import org.apache.commons.logging.Log;
 
 
-public class Jacobi
-{
+public class Jacobi{
 
-    public enum ConvergeCounter {INCONVERGED}
+    public enum ConvergeCounter {NOTCONVERGED}
 
-    /* Input
-     *   < offset, "i, j, A[i][j]" >
-     *   < offset, "i, N, b[i]" >
-     *   < offset, "i, x[i]" >
-     * Output
-     *   < i, "N, b[i]" >
-     *   < i, "j, A[i][j]" >
-     *   < j, "i, xx[i]" > j = 0..N-1, i != j
-     */
     public static class JacobiMapper extends Mapper<Object, Text, IntWritable, Text> {
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
@@ -46,74 +36,46 @@ public class Jacobi
         }
     }
 
-
-
-
-
-
-
-    /* Input
-     *   < i, "N, b[i]" >
-     *   < i, "j, A[i][j]" > j = 0..N-1
-     *   < i, "j, xx[j]" > j = 0..N-1, i != j
-     * Build A[i][] and x[]
-     *   x[i] = (b[i] - sum_i!=j(A[i][j]*x[j])) / A[i][i].
-     * Output
-     *   < i, "x[i]" > if x[i] != 0.
-     */
     public static class JacobiReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
 
         public void reduce(IntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             int N = Integer.parseInt(conf.get("matrixSize"));
 
-            double bi = 0.0;
-            double[] Ai = new double[N];
+            double tail = 0.0;
+            double[] Abi = new double[N];
             double[] x = new double[N];
             int i = key.get();
-
-          /* Build Ai[], x[] and bi. */
             for (Text value: values) {
                 String[] strArr = value.toString().split("\\s+");
                 int j = Integer.parseInt(strArr[0]);
                 if (j == N) {
-                    bi = Double.parseDouble(strArr[1]);
+                    tail = Double.parseDouble(strArr[1]);
                 } else if (strArr[1].indexOf("x") != -1) {
                     x[j] = Double.parseDouble(strArr[1].replace("x", ""));
                 } else {
-                    Ai[j] = Double.parseDouble(strArr[1]);
+                    Abi[j] = Double.parseDouble(strArr[1]);
                 }
             }
 
-
-          /* Compute x[i]. */
-            double xi = 0.0;
+            double sum = 0.0;
             for (int j = 0; j < N; j++) {
                 if (i != j) {
-                    xi += Ai[j] * x[j];
+                    sum += Abi[j] * x[j];
                 }
             }
-            xi = bi - xi;
-            xi /= Ai[i];
+            sum = tail - sum;
+            sum /= Abi[i];
 
-
-          /* Compare new and old xi. */
-            if (Math.abs(xi-x[i]) > 1e-10) {
-                /* Counter++ */
-                context.getCounter(ConvergeCounter.INCONVERGED).increment(1);
+            if (Math.abs(sum-x[i]) > 1e-10) {
+                context.getCounter(ConvergeCounter.NOTCONVERGED).increment(1);
             }
 
-            /* Output. */
-            if (xi != 0) {
-                context.write(new IntWritable(i), new Text(String.valueOf(xi)));
+            if (sum != 0) {
+                context.write(new IntWritable(i), new Text(String.valueOf(sum)));
             }
         }
     }
-
-
-
-
-
 
     public static void main(String[] args) throws Exception {
         String matrixSize = args[0];
@@ -126,7 +88,7 @@ public class Jacobi
             Configuration conf = new Configuration();
             conf.set("matrixSize", matrixSize);
 
-            Job job = Job.getInstance(conf, "Jacobi " + String.valueOf(i));
+            Job job = Job.getInstance(conf, "Jacotail " + String.valueOf(i));
             job.setNumReduceTasks(reducers);
             job.setJarByClass(Jacobi.class);
             job.setMapperClass(JacobiMapper.class);
@@ -137,12 +99,12 @@ public class Jacobi
 
             FileInputFormat.addInputPath(job, new Path(inputPath));
             if (i > 0) {
-                FileInputFormat.addInputPath(job, new Path(outputPath+"/"+Integer.toString(i)));
+                FileInputFormat.addInputPath(job, new Path(outputPath+"/Iteration"+Integer.toString(i)));
             }
-            FileOutputFormat.setOutputPath(job, new Path(outputPath+"/"+Integer.toString(i+1)));
+            FileOutputFormat.setOutputPath(job, new Path(outputPath+"/Iteration"+Integer.toString(i+1)));
             job.waitForCompletion(true);
 
-            if ((int)job.getCounters().findCounter(ConvergeCounter.INCONVERGED).getValue() == 0) {
+            if ((int)job.getCounters().findCounter(ConvergeCounter.NOTCONVERGED).getValue() == 0) {
                 break;
             }
         }
