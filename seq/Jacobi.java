@@ -155,7 +155,7 @@ public class Jacobi {
 
         Jacobi jacobi = new Jacobi(matrix, n);
 
-        jacobi.print();
+        //jacobi.print();
         jacobi.solve();
     }
 }
