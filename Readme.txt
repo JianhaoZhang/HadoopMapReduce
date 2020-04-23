@@ -26,3 +26,5 @@ There are matrix A, vector b, and intermediate solution vector x from last itera
 The mapper will create k-v pair <i, (j, A[i][j])> where i: [0, n-1] and j: [0, n-1], and keep record of the tail of last x.
 The reducer then receives the k-v pairs and calculate the sum and measure the convergence as described by the algorithm.
 The performance of the Jacobi tends to be very slow when the matrix is relatively small. No matter how small the matrix is, it usually will require tens of seconds to finish each iteration. It is possibly because of the api overhead and expensive I/O operations. It shows better result with matrix size 65536 comparing to the sequential version. Anything larger than that will immediately kill the sequential version because of heap limitation. However, thought the hadoop version is not dead on large matrix, it also slows down possibly because the hdfs system need local storage's assistance to do the work. I think the Hadoop is and should be dedicated for very large scale data processing. 
+
+There are results for 4.dat by both the hadoop and seq in the folder for santination check.
