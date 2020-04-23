@@ -71,7 +71,7 @@ public class Jacobi {
             System.out.print(iter);
             for (int i = 0; i < n; i++){
                 System.out.print(i); 
-                System.out.print(" ")
+                System.out.print(" ");
                 System.out.println(X[i]);
             }
                 
