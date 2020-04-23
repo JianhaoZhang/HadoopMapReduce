@@ -68,6 +68,13 @@ public class Jacobi {
                 X[i]  = sum/Ab[i][i];
             }
 
+            System.out.print(iter);
+            for (int i = 0; i < n; i++){
+                System.out.print(i); 
+                System.out.print(" ")
+                System.out.println(X[i]);
+            }
+                
             if(verbose) {
                 System.out.format("iteration %5d X = [", iter);
                 if(n < 2*print_n) {
